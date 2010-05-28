@@ -18,6 +18,7 @@
 #include <QList>
 #include <QHeaderView>
 #include <QProgressDialog>
+#include <QApplication>
 
 MainWindow::MainWindow(QWidget *parent) :
         QMainWindow(parent),
@@ -30,6 +31,10 @@ MainWindow::MainWindow(QWidget *parent) :
     plansTestModel=NULL;
     execModel=NULL;
     ui->setupUi(this);
+
+    connect(ui->action_New,SIGNAL(triggered()),this,SLOT(newDb()));
+    connect(ui->action_Close,SIGNAL(triggered()),this,SLOT(closeDb()));
+    connect(ui->action_Open,SIGNAL(triggered()),this,SLOT(openDb()));
 
     connect(ui->addRequirementsBtn,SIGNAL(clicked()),this,SLOT(openAddRequirements()));
     connect(ui->delRequirementBtn,SIGNAL(clicked()),this,SLOT(deleteRequirement()));
@@ -62,25 +67,75 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->actionExport_Test,SIGNAL(triggered()),this,SLOT(exportTests()));
     connect(ui->actionExport_Execs,SIGNAL(triggered()),this,SLOT(exportExecs()));
 
-    initDb();
+}
 
+void MainWindow::initDb(QString fileName){
+    db=QSqlDatabase::addDatabase("QSQLITE");
+    db.setDatabaseName(fileName);
+    if (! db.open() ){
+        QMessageBox::critical(this,tr("Connessione DB"),tr("Impossibile connettersi al db"));
+        return ;
+    }
+    dbFileName=fileName;
+    refreshTitle();
     refreshRequirements();
     refreshTests();
     refreshPlans();
 }
 
+void MainWindow::newDb(){
+    QString fileName=QFileDialog::getSaveFileName(this,tr("Apri Database"),QDir::currentPath(),"sqlite (*.sqlite)");
+    if (!fileName.isEmpty()){
+        if(QFile::exists(fileName)){
+            QFile::remove(fileName);
+        }
+        QFile baseDb(QApplication::applicationDirPath()+"/db/base.sqlite");
+        if(!baseDb.copy(fileName)){
+            QMessageBox::critical(this,tr("Nuovo Db"),tr("Impossibile creare il nuovo database"));
+        }else{
+            initDb(fileName);
+        }
+    }
+}
 
-void MainWindow::initDb(){
-    db=QSqlDatabase::addDatabase("QSQLITE");
-    db.setDatabaseName("./db/db.sqlite");
-    if (! db.open() ){
-        QMessageBox::critical(this,tr("Connessione DB"),tr("Impossibile connettersi al db"));
+void MainWindow::openDb(){
+    if (db.isOpen()){
+        int resp = QMessageBox::question(this,tr("Apri Database"),tr("Vuoi chiudere il database attuale?"),QMessageBox::Yes,QMessageBox::No);
+        if (resp==QMessageBox::Yes){
+            closeDb();
+        }else{
+            return;
+        }
+    }else{
+        QString fileName=QFileDialog::getOpenFileName(this,tr("Apri Database"),QDir::currentPath(),"sqlite (*.sqlite)");
+        if (!fileName.isEmpty()){
+            initDb(fileName);
+        }
+    }
+}
+
+void MainWindow::closeDb(){
+    if (db.isOpen()){
+        db.close();
+        dbFileName.clear();
+        refreshTitle();
+        refreshRequirements();
+        refreshTests();
+        refreshPlans();
+    }
+}
+
+void MainWindow::refreshTitle(){
+    if (db.isOpen()){
+        setWindowTitle(QApplication::applicationName()+" "+dbFileName);
+    }else{
+        setWindowTitle(QApplication::applicationName());
     }
 }
 
 void MainWindow::refreshRequirements(){
+    ui->requirementsTable->setModel(NULL);
     if (db.isOpen()){
-        ui->requirementsTable->setModel(NULL);
         free(requirementsModel);
         requirementsModel = new QSqlTableModel();
         requirementsModel->setTable("requirements");
@@ -97,9 +152,11 @@ void MainWindow::refreshRequirements(){
 }
 
 void MainWindow::openAddRequirements(){
-    AddRequirement *win = new AddRequirement(this,&db);
-    connect(win,SIGNAL(added()),this,SLOT(refreshRequirements()));
-    win->show();
+    if (db.isOpen()){
+        AddRequirement *win = new AddRequirement(this,&db);
+        connect(win,SIGNAL(added()),this,SLOT(refreshRequirements()));
+        win->show();
+    }
 }
 
 void MainWindow::deleteRequirement(){
@@ -124,8 +181,8 @@ void MainWindow::deleteRequirement(){
 }
 
 void MainWindow::refreshTests(){
+    ui->testsTable->setModel(NULL);
     if (db.isOpen()){
-        ui->testsTable->setModel(NULL);
         free(testsModel);
         testsModel = new QSqlTableModel();
         testsModel->setTable("tests");
@@ -188,8 +245,8 @@ void MainWindow::delTest(){
 }
 
 void MainWindow::refreshPlans(){
+    ui->plansTable->setModel(NULL);
     if (db.isOpen()){
-        ui->plansTable->setModel(NULL);
         free(plansModel);
         plansModel = new QSqlTableModel();
         plansModel->setEditStrategy(QSqlTableModel::OnFieldChange);
@@ -235,13 +292,14 @@ void MainWindow::delPlan(){
 }
 
 void MainWindow::refreshTestsPlan(){
+    ui->plansTestsTable->setModel(NULL);
+    ui->allTestsTable->setModel(NULL);
     if (db.isOpen()){
         if (ui->plansTable->currentIndex().isValid()){
             QSqlRecord rec=plansModel->record(ui->plansTable->currentIndex().row());
             QSqlQuery filterTest("select t.* from tests as t inner join plans_tests tp on tp.id_test=t.id and tp.type=t.type and tp.id_req=t.id_req and tp.id_det=t.id_det where tp.id_plan=:idPlan");
             filterTest.bindValue(":idPlan",rec.value("id").toInt());
             filterTest.exec();
-            ui->plansTestsTable->setModel(NULL);
             free(plansTestModel);
             plansTestModel=new QSqlQueryModel();
             plansTestModel->setQuery(filterTest);
@@ -257,7 +315,6 @@ void MainWindow::refreshTestsPlan(){
             ui->plansTestsTable->horizontalHeader()->setResizeMode(QHeaderView::ResizeToContents);
 
             //ALL TESTS
-            ui->allTestsTable->setModel(NULL);
             free(allTestsModel);
             allTestsModel = new QSqlTableModel();
             allTestsModel->setTable("tests");

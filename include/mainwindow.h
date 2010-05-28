@@ -38,7 +38,8 @@ private:
     QSqlTableModel *allTestsModel;
     QSqlQueryModel *plansTestModel;
     QSqlTableModel *execModel;
-    void initDb();
+    void initDb(QString);
+    QString dbFileName;
 private slots:
     void openAddRequirements();
     void deleteRequirement();
@@ -49,6 +50,10 @@ private slots:
     void exportExecs();
     void openCopyTests();
     void delTest();
+    void openDb();
+    void closeDb();
+    void newDb();
+    void refreshTitle();
 
     void importTests();
     void exportTests();

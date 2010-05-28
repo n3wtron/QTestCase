@@ -18,7 +18,7 @@
     <item row="0" column="0">
      <widget class="QTabWidget" name="mainTab">
       <property name="currentIndex">
-       <number>4</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="tab">
        <attribute name="title">
@@ -275,6 +275,9 @@
     <property name="title">
      <string>File</string>
     </property>
+    <addaction name="action_New"/>
+    <addaction name="action_Open"/>
+    <addaction name="action_Close"/>
    </widget>
    <widget class="QMenu" name="menuRequirements">
     <property name="title">
@@ -355,6 +358,21 @@
   <action name="actionExport_Execs">
    <property name="text">
     <string>Export Execs</string>
+   </property>
+  </action>
+  <action name="action_Open">
+   <property name="text">
+    <string>Open</string>
+   </property>
+  </action>
+  <action name="action_Close">
+   <property name="text">
+    <string>Close</string>
+   </property>
+  </action>
+  <action name="action_New">
+   <property name="text">
+    <string>New</string>
    </property>
   </action>
  </widget>
